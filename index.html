@@ -85,6 +85,10 @@
         <label>Summary</label>
         <p id="summary" class="muted"></p>
       </div>
+    <div id="answerWrap" style="display:none;margin-top:12px">
+    <label>AI Analysis</label>
+    <div id="answer" style="background:#0e1016;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);line-height:1.6"></div>
+    </div>
 
       <div id="sqlWrap" style="display:none;margin-top:8px">
         <div class="right" style="justify-content:space-between">
@@ -195,60 +199,71 @@
     return head + '\n' + body;
   }
 
-  async function ask(){
-    setError(''); setStatus('Calling function…');
-    show(els.summaryWrap,false); show(els.sqlWrap,false); show(els.tableWrap,false);
-    els.raw.textContent = '';
+async function ask(){
+  setError(''); setStatus('Calling function…');
+  show(els.summaryWrap,false); show(document.getElementById('answerWrap'),false); show(els.sqlWrap,false); show(els.tableWrap,false);
+  els.raw.textContent = '';
 
-    const url = FUNCTION_URL;
-    const q = els.question.value.trim();
-    if (!q){ setError('Enter a question'); return; }
+  const url = FUNCTION_URL;
+  const q = els.question.value.trim();
+  if (!q){ setError('Enter a question'); return; }
 
-    els.askBtn.disabled = true;
-    try{
-      const r = await fetch(url, {
-        method:'POST', headers: buildHeaders(),
-        body: JSON.stringify({ question: q })
-      });
-      const text = await r.text();
-      els.raw.textContent = text;
-      let j;
-      try{ j = JSON.parse(text); } catch{ throw new Error('Invalid JSON returned'); }
-      if (!r.ok){ throw new Error(j.error || 'Request failed'); }
+  els.askBtn.disabled = true;
+  try{
+    const r = await fetch(url, {
+      method:'POST', headers: buildHeaders(),
+      body: JSON.stringify({ question: q })
+    });
+    const text = await r.text();
+    els.raw.textContent = text;
+    let j;
+    try{ j = JSON.parse(text); } catch{ throw new Error('Invalid JSON returned'); }
+    if (!r.ok){ throw new Error(j.error || 'Request failed'); }
 
-      // Display summary & SQL
-      els.summary.textContent = j.summary || '';
-      show(els.summaryWrap, !!j.summary);
-      els.sql.textContent = j.sql || '';
-      show(els.sqlWrap, !!j.sql);
-
-      // Table
-      const cols = j.columns || [];
-      const rows = j.rows || [];
-      renderTable(cols, rows);
-      els.rowCount.textContent = 'Rows: ' + (rows.length || 0);
-      show(els.tableWrap, rows.length > 0);
-
-      // Copy & CSV handlers
-      els.copySql.onclick = () => navigator.clipboard.writeText(j.sql || '');
-      document.getElementById('downloadCsv').onclick = () => {
-        const csv = toCsv(cols, rows);
-        const blob = new Blob([csv], { type:'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'results.csv';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      };
-      setStatus('Done');
-    } catch(e){
-      setError(e.message || String(e));
-      setStatus('Error');
-    } finally{
-      els.askBtn.disabled = false;
+    // Display AI answer (the main analytical response)
+    if (j.answer) {
+      document.getElementById('answer').innerHTML = j.answer
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      show(document.getElementById('answerWrap'), true);
+    } else {
+      show(document.getElementById('answerWrap'), false);
     }
-  }
 
+    // Display summary & SQL
+    els.summary.textContent = j.summary || '';
+    show(els.summaryWrap, !!j.summary);
+    els.sql.textContent = j.sql || '';
+    show(els.sqlWrap, !!j.sql);
+
+    // Table
+    const cols = j.columns || [];
+    const rows = j.rows || [];
+    renderTable(cols, rows);
+    els.rowCount.textContent = 'Rows: ' + (rows.length || 0);
+    show(els.tableWrap, rows.length > 0);
+
+    // Copy & CSV handlers
+    els.copySql.onclick = () => navigator.clipboard.writeText(j.sql || '');
+    document.getElementById('downloadCsv').onclick = () => {
+      const csv = toCsv(cols, rows);
+      const blob = new Blob([csv], { type:'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'results.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    setStatus('Done');
+  } catch(e){
+    setError(e.message || String(e));
+    setStatus('Error');
+  } finally{
+    els.askBtn.disabled = false;
+  }
+}
   async function testSchema(){
     setError(''); setStatus('Calling /schema…'); els.raw.textContent = '';
     const url = FUNCTION_URL.replace(/\/$/, '') + '/schema';
