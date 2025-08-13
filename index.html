@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cricket SQL Copilot — Test Page</title>
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#121318; --muted:#9aa1ad; --text:#e9ecf1; --accent:#6ee7b7; --danger:#ff6b6b; --border:#222432;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1024px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+    h1{font-size:20px;margin:0 0 8px}
+    p.sub{color:var(--muted);margin:0 0 16px}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1016;color:var(--text)}
+    textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1016;color:var(--text);min-height:70px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > *{flex:1}
+    button{appearance:none;border:1px solid var(--border);background:#171924;color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
+    button.primary{background:var(--accent);color:#032014;border-color:transparent;font-weight:600}
+    button.ghost{background:transparent}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1016;color:var(--muted);cursor:pointer}
+    .muted{color:var(--muted)}
+    .error{color:var(--danger)}
+    details{border:1px solid var(--border);border-radius:12px;padding:8px 12px;background:#0e1016}
+    details summary{cursor:pointer;color:var(--muted)}
+    pre{background:#0a0c12;border:1px solid var(--border);padding:12px;border-radius:12px;overflow:auto}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border:1px solid var(--border);padding:8px 10px;text-align:left}
+    th{background:#0f1118}
+    .right{display:flex;gap:8px;align-items:center}
+    .pill{display:inline-block;background:#0f1118;border:1px solid var(--border);padding:3px 8px;border-radius:999px;color:var(--muted);font-size:12px}
+    .footer{margin-top:18px;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Cricket SQL Copilot — Test</h1>
+      <p class="sub">Call your Supabase Edge Function, see the generated SQL, and preview results.</p>
+
+      <label>Edge Function URL (hardcoded)</label>
+        <input id="fnUrl" type="text" value="https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot" disabled />
+
+      <details style="margin-top:8px">
+        <summary>Advanced headers (optional)</summary>
+        <div class="row" style="margin-top:8px">
+          <div>
+            <label>apikey (optional)</label>
+            <input id="apikey" type="text" placeholder="Your Supabase anon key (if required)" />
+          </div>
+          <div>
+            <label>Authorization (optional)</label>
+            <input id="auth" type="text" placeholder="Bearer &lt;token&gt; (if required)" />
+          </div>
+        </div>
+      </details>
+
+      <label style="margin-top:12px">Ask a question</label>
+      <textarea id="question" placeholder="e.g., Top 10 run scorers in 2019"></textarea>
+
+      <div class="row" style="align-items:center;margin-top:8px">
+        <div class="right">
+          <button id="askBtn" class="primary">Ask</button>
+          <button id="schemaBtn" class="ghost">Test /schema</button>
+          <span id="status" class="pill">Idle</span>
+        </div>
+        <div class="chips">
+          <span class="chip" data-q="Top 10 run scorers in 2019">Top 10 run scorers in 2019</span>
+          <span class="chip" data-q="Best economy bowlers (min 30 overs) in 2020">Best economy bowlers, 2020</span>
+          <span class="chip" data-q="Win % by toss decision per season">Win % by toss decision / season</span>
+          <span class="chip" data-q="Matches with super over and winner">Super over matches + winner</span>
+        </div>
+      </div>
+
+      <p id="err" class="error" style="margin-top:10px"></p>
+
+      <div id="summaryWrap" style="display:none;margin-top:8px">
+        <label>Summary</label>
+        <p id="summary" class="muted"></p>
+      </div>
+
+      <div id="sqlWrap" style="display:none;margin-top:8px">
+        <div class="right" style="justify-content:space-between">
+          <label>Generated SQL</label>
+          <div class="right">
+            <button id="copySql">Copy</button>
+          </div>
+        </div>
+        <pre><code id="sql"></code></pre>
+      </div>
+
+      <div id="tableWrap" style="display:none;margin-top:8px">
+        <div class="right" style="justify-content:space-between">
+          <label>Results</label>
+          <div class="right">
+            <button id="downloadCsv">Download CSV</button>
+            <span id="rowCount" class="pill">Rows: 0</span>
+          </div>
+        </div>
+        <div id="tableContainer"></div>
+      </div>
+
+      <details style="margin-top:12px">
+        <summary>Raw response</summary>
+        <pre><code id="raw"></code></pre>
+      </details>
+
+      <div class="footer">Tip: your Edge Function must allow CORS for this page’s domain. In our code it’s set to <code>*</code>.</div>
+    </div>
+  </div>
+
+<script>
+  const els = {
+    fnUrl: document.getElementById('fnUrl'),
+    apikey: document.getElementById('apikey'),
+    auth: document.getElementById('auth'),
+    question: document.getElementById('question'),
+    askBtn: document.getElementById('askBtn'),
+    schemaBtn: document.getElementById('schemaBtn'),
+    status: document.getElementById('status'),
+    err: document.getElementById('err'),
+    summaryWrap: document.getElementById('summaryWrap'),
+    summary: document.getElementById('summary'),
+    sqlWrap: document.getElementById('sqlWrap'),
+    sql: document.getElementById('sql'),
+    copySql: document.getElementById('copySql'),
+    tableWrap: document.getElementById('tableWrap'),
+    tableContainer: document.getElementById('tableContainer'),
+    rowCount: document.getElementById('rowCount'),
+    raw: document.getElementById('raw'),
+  };
+
+  // Hardcode your Edge Function URL
+  const FUNCTION_URL = "https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot";
+  // Reflect it in the input and lock it
+  if (els.fnUrl) {
+    els.fnUrl.value = FUNCTION_URL;
+    els.fnUrl.disabled = true;
+  }
+
+  // Persist only headers locally for convenience
+  const LS_KEYS = { apikey:'sqlcopilot:apikey', auth:'sqlcopilot:auth' };
+  els.apikey.value = localStorage.getItem(LS_KEYS.apikey) || '';
+  els.auth.value = localStorage.getItem(LS_KEYS.auth) || '';
+  [els.apikey, els.auth].forEach(inp => inp.addEventListener('change', () => {
+    localStorage.setItem(LS_KEYS.apikey, els.apikey.value.trim());
+    localStorage.setItem(LS_KEYS.auth, els.auth.value.trim());
+  }));
+
+  // Example chips
+  document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+    els.question.value = ch.getAttribute('data-q');
+  }));
+
+  function setStatus(text){ els.status.textContent = text; }
+  function setError(msg){ els.err.textContent = msg || ''; }
+  function show(el, on){ el.style.display = on ? '' : 'none'; }
+
+  // If Authorization is empty but apikey provided, default to Bearer <apikey>
+  function buildHeaders(){
+    const h = { 'Content-Type': 'application/json' };
+    const apikey = els.apikey.value.trim();
+    const auth = els.auth.value.trim();
+    if (apikey) h['apikey'] = apikey;
+    if (auth) h['Authorization'] = auth;
+    else if (apikey) h['Authorization'] = `Bearer ${apikey}`;
+    return h;
+  }
+
+  function renderTable(columns, rows){
+    if (!columns || !columns.length){ els.tableContainer.innerHTML = '<p class="muted">No columns</p>'; return; }
+    let html = '<table><thead><tr>' + columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead><tbody>';
+    for (const r of rows){
+      html += '<tr>' + columns.map(c=>`<td>${escapeHtml(r[c])}</td>`).join('') + '</tr>';
+    }
+    html += '</tbody></table>';
+    els.tableContainer.innerHTML = html;
+  }
+
+  function escapeHtml(v){
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+  }
+
+  function toCsv(columns, rows){
+    const esc = (x)=>`"${String(x ?? '').replace(/"/g,'""')}"`;
+    const head = columns.map(esc).join(',');
+    const body = rows.map(r => columns.map(c => esc(r[c])).join(',')).join('\n');
+    return head + '\n' + body;
+  }
+
+  async function ask(){
+    setError(''); setStatus('Calling function…');
+    show(els.summaryWrap,false); show(els.sqlWrap,false); show(els.tableWrap,false);
+    els.raw.textContent = '';
+
+    const url = FUNCTION_URL;
+    const q = els.question.value.trim();
+    if (!q){ setError('Enter a question'); return; }
+
+    els.askBtn.disabled = true;
+    try{
+      const r = await fetch(url, {
+        method:'POST', headers: buildHeaders(),
+        body: JSON.stringify({ question: q })
+      });
+      const text = await r.text();
+      els.raw.textContent = text;
+      let j;
+      try{ j = JSON.parse(text); } catch{ throw new Error('Invalid JSON returned'); }
+      if (!r.ok){ throw new Error(j.error || 'Request failed'); }
+
+      // Display summary & SQL
+      els.summary.textContent = j.summary || '';
+      show(els.summaryWrap, !!j.summary);
+      els.sql.textContent = j.sql || '';
+      show(els.sqlWrap, !!j.sql);
+
+      // Table
+      const cols = j.columns || [];
+      const rows = j.rows || [];
+      renderTable(cols, rows);
+      els.rowCount.textContent = 'Rows: ' + (rows.length || 0);
+      show(els.tableWrap, rows.length > 0);
+
+      // Copy & CSV handlers
+      els.copySql.onclick = () => navigator.clipboard.writeText(j.sql || '');
+      document.getElementById('downloadCsv').onclick = () => {
+        const csv = toCsv(cols, rows);
+        const blob = new Blob([csv], { type:'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'results.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+      setStatus('Done');
+    } catch(e){
+      setError(e.message || String(e));
+      setStatus('Error');
+    } finally{
+      els.askBtn.disabled = false;
+    }
+  }
+
+  async function testSchema(){
+    setError(''); setStatus('Calling /schema…'); els.raw.textContent = '';
+    const url = FUNCTION_URL.replace(/\/$/, '') + '/schema';
+    try{
+      const r = await fetch(url, { headers: buildHeaders() });
+      const text = await r.text();
+      els.raw.textContent = text;
+      if (!r.ok) throw new Error('Schema request failed');
+      setStatus('Schema OK');
+    } catch(e){ setError(e.message || String(e)); setStatus('Error'); }
+  }
+
+  els.askBtn.addEventListener('click', ask);
+  els.schemaBtn.addEventListener('click', testSchema);
+</script>
+
+</body>
+</html>
