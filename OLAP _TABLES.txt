@@ -1,0 +1,875 @@
+create materialized view public.bowler_performance_mv as
+with
+  bowling_spells as (
+    select
+      d.match_id,
+      d.inning,
+      d.bowler_id,
+      d.batting_team_id,
+      m.season_id,
+      m.match_date,
+      m.match_type,
+      m.super_over,
+      case
+        when d.inning <= 2 then 'regular'::text
+        else 'super_over'::text
+      end as innings_type,
+      count(
+        case
+          when (
+            d.extras_type <> all (
+              array[
+                'wide'::extras_type_enum,
+                'noball'::extras_type_enum
+              ]
+            )
+          )
+          or d.extras_type is null then 1
+          else null::integer
+        end
+      ) as balls_bowled,
+      count(*) as total_deliveries,
+      sum(
+        d.batsman_runs + case
+          when d.extras_type = any (
+            array[
+              'wide'::extras_type_enum,
+              'noball'::extras_type_enum
+            ]
+          ) then d.extra_runs::integer
+          else 0
+        end
+      ) as runs_conceded,
+      sum(
+        case
+          when d.is_wicket
+          and (
+            d.dismissal_kind <> all (
+              array[
+                'run out'::dismissal_enum,
+                'retired hurt'::dismissal_enum,
+                'obstructing field'::dismissal_enum
+              ]
+            )
+          ) then 1
+          else 0
+        end
+      ) as wickets,
+      sum(
+        case
+          when d.extras_type = 'wide'::extras_type_enum then 1
+          else 0
+        end
+      ) as wides,
+      sum(
+        case
+          when d.extras_type = 'noball'::extras_type_enum then 1
+          else 0
+        end
+      ) as noballs,
+      sum(
+        case
+          when d.total_runs = 0 then 1
+          else 0
+        end
+      ) as dot_balls,
+      sum(
+        case
+          when d.batsman_runs = 4 then 1
+          else 0
+        end
+      ) as fours_conceded,
+      sum(
+        case
+          when d.batsman_runs = 6 then 1
+          else 0
+        end
+      ) as sixes_conceded
+    from
+      deliveries d
+      join matches m on d.match_id = m.match_id
+    group by
+      d.match_id,
+      d.inning,
+      d.bowler_id,
+      d.batting_team_id,
+      m.season_id,
+      m.match_date,
+      m.match_type,
+      m.super_over
+  )
+select
+  bs.match_id,
+  bs.inning,
+  bs.bowler_id,
+  bs.batting_team_id,
+  bs.season_id,
+  bs.match_date,
+  bs.match_type,
+  bs.super_over,
+  bs.innings_type,
+  bs.balls_bowled,
+  bs.total_deliveries,
+  bs.runs_conceded,
+  bs.wickets,
+  bs.wides,
+  bs.noballs,
+  bs.dot_balls,
+  bs.fours_conceded,
+  bs.sixes_conceded,
+  p.player_name as bowler_name,
+  t.team_name as batting_team,
+  s.season_year,
+  (
+    floor(bs.balls_bowled::numeric / 6.0) || '.'::text
+  ) || (bs.balls_bowled % 6::bigint) as overs_bowled,
+  round(
+    bs.runs_conceded::numeric * 6.0 / NULLIF(bs.balls_bowled, 0)::numeric,
+    2
+  ) as economy_rate,
+  round(
+    bs.runs_conceded::numeric / NULLIF(bs.wickets, 0)::numeric,
+    2
+  ) as bowling_average,
+  round(
+    bs.balls_bowled::numeric / NULLIF(bs.wickets, 0)::numeric,
+    2
+  ) as bowling_strike_rate,
+  round(
+    bs.dot_balls::numeric * 100.0 / NULLIF(bs.total_deliveries, 0)::numeric,
+    2
+  ) as dot_ball_percentage
+from
+  bowling_spells bs
+  join players p on bs.bowler_id = p.player_id
+  left join teams t on bs.batting_team_id = t.team_id
+  join seasons s on bs.season_id = s.season_id;
+
+
+  create table public.cities (
+  city_id serial not null,
+  city_name text null,
+  constraint cities_pkey primary key (city_id),
+  constraint cities_city_name_key unique (city_name)
+) TABLESPACE pg_default;
+
+
+create table public.cricket_embeddings (
+  id serial not null,
+  content_type text null,
+  content text null,
+  embedding double precision[] not null,
+  metadata jsonb null,
+  constraint cricket_embeddings_pkey primary key (id)
+) TABLESPACE pg_default;
+
+
+create table public.cricket_knowledge (
+  id serial not null,
+  knowledge_type text not null,
+  title text not null,
+  content text not null,
+  embedding extensions.vector null,
+  relevance_score double precision null default 1.0,
+  created_at timestamp without time zone null default now(),
+  constraint cricket_knowledge_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_knowledge_embedding on public.cricket_knowledge using ivfflat (embedding extensions.vector_cosine_ops) TABLESPACE pg_default;
+
+create index IF not exists idx_knowledge_type on public.cricket_knowledge using btree (knowledge_type) TABLESPACE pg_default;
+
+
+
+
+create table public.deliveries (
+  match_id bigint not null,
+  inning smallint not null,
+  over smallint not null,
+  ball smallint not null,
+  batting_team_id integer null,
+  bowling_team_id integer null,
+  batter_id integer null,
+  bowler_id integer null,
+  non_striker_id integer null,
+  batsman_runs smallint null,
+  extra_runs smallint null,
+  total_runs smallint null,
+  extras_type public.extras_type_enum null,
+  is_wicket boolean null,
+  player_dismissed_id integer null,
+  dismissal_kind public.dismissal_enum null,
+  fielder_id integer null,
+  delivery_id bigint generated by default as identity not null,
+  constraint deliveries_pkey primary key (delivery_id),
+  constraint deliveries_match_ball_key unique (match_id, inning, over, ball),
+  constraint deliveries_delivery_id_key unique (delivery_id),
+  constraint deliveries_bowling_team_id_fkey foreign KEY (bowling_team_id) references teams (team_id),
+  constraint deliveries_fielder_id_fkey foreign KEY (fielder_id) references players (player_id),
+  constraint deliveries_match_id_fkey foreign KEY (match_id) references matches (match_id) on delete CASCADE,
+  constraint deliveries_non_striker_id_fkey foreign KEY (non_striker_id) references players (player_id),
+  constraint deliveries_batter_id_fkey foreign KEY (batter_id) references players (player_id),
+  constraint deliveries_player_dismissed_id_fkey foreign KEY (player_dismissed_id) references players (player_id),
+  constraint deliveries_batting_team_id_fkey foreign KEY (batting_team_id) references teams (team_id),
+  constraint deliveries_bowler_id_fkey foreign KEY (bowler_id) references players (player_id)
+) TABLESPACE pg_default;
+
+create index IF not exists deliveries_batter_id_idx on public.deliveries using btree (batter_id) TABLESPACE pg_default;
+
+create index IF not exists deliveries_bowler_id_idx on public.deliveries using btree (bowler_id) TABLESPACE pg_default;
+
+
+
+create table public.entity_search (
+  id serial not null,
+  entity_type text not null,
+  entity_id integer not null,
+  primary_name text not null,
+  search_tokens text[] null,
+  aliases text[] null,
+  popularity_score integer null default 0,
+  created_at timestamp without time zone null default now(),
+  constraint entity_search_pkey primary key (id),
+  constraint entity_search_entity_type_entity_id_key unique (entity_type, entity_id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_entity_search_primary on public.entity_search using gin (primary_name gin_trgm_ops) TABLESPACE pg_default;
+
+create index IF not exists idx_entity_search_tokens on public.entity_search using gin (search_tokens) TABLESPACE pg_default;
+
+create index IF not exists idx_entity_search_aliases on public.entity_search using gin (aliases) TABLESPACE pg_default;
+
+
+
+
+create materialized view public.player_career_stats_mv as
+with
+  batting_stats as (
+    select
+      player_innings_mv.batter_id,
+      player_innings_mv.player_name,
+      player_innings_mv.innings_type,
+      count(distinct player_innings_mv.match_id) as matches_played,
+      count(*) as innings_batted,
+      sum(player_innings_mv.runs_scored) as total_runs,
+      sum(player_innings_mv.balls_faced) as total_balls,
+      sum(player_innings_mv.was_dismissed) as times_dismissed,
+      max(player_innings_mv.runs_scored) as highest_score,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'century'::text then 1
+          else 0
+        end
+      ) as centuries,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'fifty'::text then 1
+          else 0
+        end
+      ) as fifties,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'duck'::text then 1
+          else 0
+        end
+      ) as ducks,
+      sum(player_innings_mv.fours) as total_fours,
+      sum(player_innings_mv.sixes) as total_sixes,
+      round(avg(player_innings_mv.strike_rate), 2) as avg_strike_rate
+    from
+      player_innings_mv
+    group by
+      player_innings_mv.batter_id,
+      player_innings_mv.player_name,
+      player_innings_mv.innings_type
+  ),
+  bowling_stats as (
+    select
+      bowler_performance_mv.bowler_id,
+      bowler_performance_mv.bowler_name,
+      bowler_performance_mv.innings_type,
+      count(distinct bowler_performance_mv.match_id) as matches_bowled,
+      count(*) as innings_bowled,
+      sum(bowler_performance_mv.balls_bowled) as total_balls_bowled,
+      sum(bowler_performance_mv.runs_conceded) as total_runs_conceded,
+      sum(bowler_performance_mv.wickets) as total_wickets,
+      min(
+        case
+          when bowler_performance_mv.wickets > 0 then bowler_performance_mv.economy_rate
+          else null::numeric
+        end
+      ) as best_economy,
+      max(bowler_performance_mv.wickets) as best_bowling_figures,
+      sum(bowler_performance_mv.dot_balls) as total_dot_balls,
+      round(avg(bowler_performance_mv.economy_rate), 2) as avg_economy_rate
+    from
+      bowler_performance_mv
+    group by
+      bowler_performance_mv.bowler_id,
+      bowler_performance_mv.bowler_name,
+      bowler_performance_mv.innings_type
+  )
+select
+  COALESCE(b.batter_id, bo.bowler_id) as player_id,
+  COALESCE(b.player_name, bo.bowler_name) as player_name,
+  COALESCE(b.innings_type, bo.innings_type) as innings_type,
+  b.matches_played,
+  b.innings_batted,
+  b.total_runs,
+  b.total_balls,
+  b.times_dismissed,
+  b.highest_score,
+  b.centuries,
+  b.fifties,
+  b.ducks,
+  b.total_fours,
+  b.total_sixes,
+  round(
+    b.total_runs / NULLIF(b.times_dismissed, 0)::numeric,
+    2
+  ) as batting_average,
+  round(
+    b.total_runs * 100.0 / NULLIF(b.total_balls, 0::numeric),
+    2
+  ) as career_strike_rate,
+  bo.matches_bowled,
+  bo.innings_bowled,
+  bo.total_balls_bowled,
+  bo.total_runs_conceded,
+  bo.total_wickets,
+  bo.best_economy,
+  bo.best_bowling_figures,
+  bo.total_dot_balls,
+  round(
+    bo.total_runs_conceded / NULLIF(bo.total_wickets, 0::numeric),
+    2
+  ) as bowling_average,
+  round(
+    bo.total_balls_bowled / NULLIF(bo.total_wickets, 0::numeric),
+    2
+  ) as bowling_strike_rate,
+  bo.avg_economy_rate
+from
+  batting_stats b
+  full join bowling_stats bo on b.batter_id = bo.bowler_id
+  and b.innings_type = bo.innings_type;
+
+
+
+  create materialized view public.player_career_stats_mv as
+with
+  batting_stats as (
+    select
+      player_innings_mv.batter_id,
+      player_innings_mv.player_name,
+      player_innings_mv.innings_type,
+      count(distinct player_innings_mv.match_id) as matches_played,
+      count(*) as innings_batted,
+      sum(player_innings_mv.runs_scored) as total_runs,
+      sum(player_innings_mv.balls_faced) as total_balls,
+      sum(player_innings_mv.was_dismissed) as times_dismissed,
+      max(player_innings_mv.runs_scored) as highest_score,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'century'::text then 1
+          else 0
+        end
+      ) as centuries,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'fifty'::text then 1
+          else 0
+        end
+      ) as fifties,
+      sum(
+        case
+          when player_innings_mv.innings_category = 'duck'::text then 1
+          else 0
+        end
+      ) as ducks,
+      sum(player_innings_mv.fours) as total_fours,
+      sum(player_innings_mv.sixes) as total_sixes,
+      round(avg(player_innings_mv.strike_rate), 2) as avg_strike_rate
+    from
+      player_innings_mv
+    group by
+      player_innings_mv.batter_id,
+      player_innings_mv.player_name,
+      player_innings_mv.innings_type
+  ),
+  bowling_stats as (
+    select
+      bowler_performance_mv.bowler_id,
+      bowler_performance_mv.bowler_name,
+      bowler_performance_mv.innings_type,
+      count(distinct bowler_performance_mv.match_id) as matches_bowled,
+      count(*) as innings_bowled,
+      sum(bowler_performance_mv.balls_bowled) as total_balls_bowled,
+      sum(bowler_performance_mv.runs_conceded) as total_runs_conceded,
+      sum(bowler_performance_mv.wickets) as total_wickets,
+      min(
+        case
+          when bowler_performance_mv.wickets > 0 then bowler_performance_mv.economy_rate
+          else null::numeric
+        end
+      ) as best_economy,
+      max(bowler_performance_mv.wickets) as best_bowling_figures,
+      sum(bowler_performance_mv.dot_balls) as total_dot_balls,
+      round(avg(bowler_performance_mv.economy_rate), 2) as avg_economy_rate
+    from
+      bowler_performance_mv
+    group by
+      bowler_performance_mv.bowler_id,
+      bowler_performance_mv.bowler_name,
+      bowler_performance_mv.innings_type
+  )
+select
+  COALESCE(b.batter_id, bo.bowler_id) as player_id,
+  COALESCE(b.player_name, bo.bowler_name) as player_name,
+  COALESCE(b.innings_type, bo.innings_type) as innings_type,
+  b.matches_played,
+  b.innings_batted,
+  b.total_runs,
+  b.total_balls,
+  b.times_dismissed,
+  b.highest_score,
+  b.centuries,
+  b.fifties,
+  b.ducks,
+  b.total_fours,
+  b.total_sixes,
+  round(
+    b.total_runs / NULLIF(b.times_dismissed, 0)::numeric,
+    2
+  ) as batting_average,
+  round(
+    b.total_runs * 100.0 / NULLIF(b.total_balls, 0::numeric),
+    2
+  ) as career_strike_rate,
+  bo.matches_bowled,
+  bo.innings_bowled,
+  bo.total_balls_bowled,
+  bo.total_runs_conceded,
+  bo.total_wickets,
+  bo.best_economy,
+  bo.best_bowling_figures,
+  bo.total_dot_balls,
+  round(
+    bo.total_runs_conceded / NULLIF(bo.total_wickets, 0::numeric),
+    2
+  ) as bowling_average,
+  round(
+    bo.total_balls_bowled / NULLIF(bo.total_wickets, 0::numeric),
+    2
+  ) as bowling_strike_rate,
+  bo.avg_economy_rate
+from
+  batting_stats b
+  full join bowling_stats bo on b.batter_id = bo.bowler_id
+  and b.innings_type = bo.innings_type;
+
+
+  create table public.query_cache (
+  id serial not null,
+  question text not null,
+  question_normalized text not null,
+  question_embedding extensions.vector null,
+  sql_query text not null,
+  result_summary jsonb null,
+  row_count integer null,
+  execution_time_ms integer null,
+  cache_hit_count integer null default 0,
+  created_at timestamp without time zone null default now(),
+  expires_at timestamp without time zone null default (now() + '1 day'::interval),
+  constraint query_cache_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_cache_embedding on public.query_cache using ivfflat (question_embedding extensions.vector_cosine_ops) TABLESPACE pg_default;
+
+create index IF not exists idx_cache_normalized on public.query_cache using btree (question_normalized) TABLESPACE pg_default;
+
+create index IF not exists idx_cache_expires on public.query_cache using btree (expires_at) TABLESPACE pg_default;
+
+
+create table public.query_patterns (
+  id serial not null,
+  pattern_category text not null,
+  question_template text not null,
+  sql_template text not null,
+  example_question text null,
+  embedding extensions.vector null,
+  usage_count integer null default 0,
+  avg_execution_time_ms integer null,
+  success_rate double precision null default 1.0,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  constraint query_patterns_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_patterns_embedding on public.query_patterns using ivfflat (embedding extensions.vector_cosine_ops) TABLESPACE pg_default;
+
+create index IF not exists idx_patterns_category on public.query_patterns using btree (pattern_category) TABLESPACE pg_default;
+
+create index IF not exists idx_patterns_usage on public.query_patterns using btree (usage_count desc) TABLESPACE pg_default;
+
+
+create view public.query_performance_stats as
+select
+  query_analytics.question_category,
+  count(*) as total_queries,
+  avg(query_analytics.execution_time_ms) as avg_execution_time,
+  max(query_analytics.execution_time_ms) as max_execution_time,
+  min(query_analytics.execution_time_ms) as min_execution_time,
+  sum(
+    case
+      when query_analytics.cache_hit then 1
+      else 0
+    end
+  )::double precision / count(*)::double precision as cache_hit_rate,
+  sum(
+    case
+      when query_analytics.error_message is null then 1
+      else 0
+    end
+  )::double precision / count(*)::double precision as success_rate,
+  date_trunc('hour'::text, query_analytics.created_at) as hour
+from
+  query_analytics
+where
+  query_analytics.created_at > (now() - '7 days'::interval)
+group by
+  query_analytics.question_category,
+  (
+    date_trunc('hour'::text, query_analytics.created_at)
+  );
+
+
+create table public.seasons (
+  season_id serial not null,
+  season_year integer null,
+  constraint seasons_pkey primary key (season_id),
+  constraint seasons_season_year_key unique (season_year)
+) TABLESPACE pg_default;
+
+
+create table public.teams (
+  team_id serial not null,
+  team_name text null,
+  constraint teams_pkey primary key (team_id),
+  constraint teams_team_name_key unique (team_name)
+) TABLESPACE pg_default;
+
+
+create table public.umpires (
+  umpire_id serial not null,
+  umpire_name text null,
+  constraint umpires_pkey primary key (umpire_id),
+  constraint umpires_umpire_name_key unique (umpire_name)
+) TABLESPACE pg_default;
+
+
+create table public.venues (
+  venue_id serial not null,
+  venue_name text null,
+  city_id integer null,
+  constraint venues_pkey primary key (venue_id),
+  constraint venues_venue_name_key unique (venue_name),
+  constraint venues_city_id_fkey foreign KEY (city_id) references cities (city_id)
+) TABLESPACE pg_default;
+
+
+create materialized view public.batting_performance_mv as
+with
+  batting_innings as (
+    select
+      d.match_id,
+      d.inning,
+      d.batter_id,
+      d.batting_team_id,
+      d.bowling_team_id,
+      m.season_id,
+      m.match_date,
+      m.match_type,
+      case
+        when d.inning <= 2 then 'regular'::text
+        else 'super_over'::text
+      end as innings_type,
+      sum(d.batsman_runs) as runs_scored,
+      count(
+        case
+          when (
+            d.extras_type <> all (
+              array[
+                'wide'::extras_type_enum,
+                'noball'::extras_type_enum
+              ]
+            )
+          )
+          or d.extras_type is null then 1
+          else null::integer
+        end
+      ) as balls_faced,
+      max(
+        case
+          when d.is_wicket then 1
+          else 0
+        end
+      ) as was_dismissed,
+      max(
+        case
+          when d.is_wicket then d.dismissal_kind
+          else null::dismissal_enum
+        end
+      ) as dismissal_type,
+      sum(
+        case
+          when d.batsman_runs = 4 then 1
+          else 0
+        end
+      ) as fours,
+      sum(
+        case
+          when d.batsman_runs = 6 then 1
+          else 0
+        end
+      ) as sixes
+    from
+      deliveries d
+      join matches m on d.match_id = m.match_id
+    group by
+      d.match_id,
+      d.inning,
+      d.batter_id,
+      d.batting_team_id,
+      d.bowling_team_id,
+      m.season_id,
+      m.match_date,
+      m.match_type
+  )
+select
+  bi.match_id,
+  bi.inning,
+  bi.batter_id,
+  bi.batting_team_id,
+  bi.bowling_team_id,
+  bi.season_id,
+  bi.match_date,
+  bi.match_type,
+  bi.innings_type,
+  bi.runs_scored,
+  bi.balls_faced,
+  bi.was_dismissed,
+  bi.dismissal_type,
+  bi.fours,
+  bi.sixes,
+  p.player_name as batter_name,
+  t1.team_name as batting_team,
+  t2.team_name as bowling_team,
+  s.season_year,
+  round(
+    bi.runs_scored::numeric * 100.0 / NULLIF(bi.balls_faced, 0)::numeric,
+    2
+  ) as strike_rate,
+  case
+    when bi.runs_scored >= 100 then 'century'::text
+    when bi.runs_scored >= 50 then 'fifty'::text
+    when bi.runs_scored = 0
+    and bi.was_dismissed = 1 then 'duck'::text
+    else 'normal'::text
+  end as innings_category
+from
+  batting_innings bi
+  join players p on bi.batter_id = p.player_id
+  left join teams t1 on bi.batting_team_id = t1.team_id
+  left join teams t2 on bi.bowling_team_id = t2.team_id
+  join seasons s on bi.season_id = s.season_id;
+
+
+
+
+create materialized view public.player_vs_team_mv as
+select
+  'batting'::text as performance_type,
+  bp.batter_id as player_id,
+  bp.batter_name as player_name,
+  bp.bowling_team_id as opponent_team_id,
+  bp.bowling_team as opponent_team,
+  count(distinct bp.match_id) as matches,
+  count(*) as innings,
+  sum(bp.runs_scored) as total_runs,
+  sum(bp.balls_faced) as total_balls,
+  sum(bp.was_dismissed) as times_dismissed,
+  max(bp.runs_scored) as highest_score,
+  round(avg(bp.runs_scored), 2) as avg_runs,
+  round(avg(bp.strike_rate), 2) as avg_strike_rate,
+  sum(
+    case
+      when bp.innings_category = 'century'::text then 1
+      else 0
+    end
+  ) as centuries,
+  sum(
+    case
+      when bp.innings_category = 'fifty'::text then 1
+      else 0
+    end
+  ) as fifties
+from
+  batting_performance_mv bp
+where
+  bp.innings_type = 'regular'::text
+group by
+  bp.batter_id,
+  bp.batter_name,
+  bp.bowling_team_id,
+  bp.bowling_team
+union all
+select
+  'bowling'::text as performance_type,
+  bo.bowler_id as player_id,
+  bo.bowler_name as player_name,
+  bo.batting_team_id as opponent_team_id,
+  bo.batting_team as opponent_team,
+  count(distinct bo.match_id) as matches,
+  count(*) as innings,
+  sum(bo.runs_conceded) as total_runs,
+  sum(bo.balls_bowled) as total_balls,
+  sum(bo.wickets) as times_dismissed,
+  max(bo.wickets) as highest_score,
+  round(
+    sum(bo.runs_conceded) * 1.0 / NULLIF(sum(bo.wickets), 0::numeric),
+    2
+  ) as avg_runs,
+  round(
+    sum(bo.runs_conceded) * 6.0 / NULLIF(sum(bo.balls_bowled), 0::numeric),
+    2
+  ) as avg_strike_rate,
+  sum(
+    case
+      when bo.wickets >= 5 then 1
+      else 0
+    end
+  ) as centuries,
+  sum(
+    case
+      when bo.wickets >= 3 then 1
+      else 0
+    end
+  ) as fifties
+from
+  bowler_performance_mv bo
+where
+  bo.innings_type = 'regular'::text
+group by
+  bo.bowler_id,
+  bo.bowler_name,
+  bo.batting_team_id,
+  bo.batting_team;
+
+
+
+create materialized view public.season_batting_stats_mv as
+select
+  bp.batter_id,
+  bp.batter_name,
+  bp.season_year,
+  count(distinct bp.match_id) as matches,
+  count(*) as innings,
+  sum(bp.runs_scored) as total_runs,
+  sum(bp.balls_faced) as total_balls,
+  sum(bp.was_dismissed) as times_dismissed,
+  max(bp.runs_scored) as highest_score,
+  round(
+    sum(bp.runs_scored) * 1.0 / NULLIF(sum(bp.was_dismissed), 0)::numeric,
+    2
+  ) as batting_average,
+  round(
+    sum(bp.runs_scored) * 100.0 / NULLIF(sum(bp.balls_faced), 0::numeric),
+    2
+  ) as strike_rate,
+  sum(
+    case
+      when bp.innings_category = 'century'::text then 1
+      else 0
+    end
+  ) as centuries,
+  sum(
+    case
+      when bp.innings_category = 'fifty'::text then 1
+      else 0
+    end
+  ) as fifties,
+  sum(bp.fours) as fours,
+  sum(bp.sixes) as sixes
+from
+  batting_performance_mv bp
+where
+  bp.innings_type = 'regular'::text
+group by
+  bp.batter_id,
+  bp.batter_name,
+  bp.season_year;
+
+
+create materialized view public.season_bowling_stats_mv as
+select
+  bo.bowler_id,
+  bo.bowler_name,
+  bo.season_year,
+  count(distinct bo.match_id) as matches,
+  count(*) as innings,
+  sum(bo.balls_bowled) as total_balls,
+  sum(bo.runs_conceded) as total_runs,
+  sum(bo.wickets) as total_wickets,
+  round(
+    sum(bo.runs_conceded) * 6.0 / NULLIF(sum(bo.balls_bowled), 0::numeric),
+    2
+  ) as economy_rate,
+  round(
+    sum(bo.runs_conceded) * 1.0 / NULLIF(sum(bo.wickets), 0::numeric),
+    2
+  ) as bowling_average,
+  round(
+    sum(bo.balls_bowled) * 1.0 / NULLIF(sum(bo.wickets), 0::numeric),
+    2
+  ) as strike_rate,
+  sum(bo.dot_balls) as dot_balls,
+  max(bo.wickets) as best_figures
+from
+  bowler_performance_mv bo
+where
+  bo.innings_type = 'regular'::text
+group by
+  bo.bowler_id,
+  bo.bowler_name,
+  bo.season_year;
+
+
+
+
+-- First, create unique indexes if they don't exist
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bowler_performance_unique 
+ON public.bowler_performance_mv (match_id, inning, bowler_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_batting_performance_unique 
+ON public.batting_performance_mv (match_id, inning, batter_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_player_career_unique 
+ON public.player_career_stats_mv (player_id, innings_type);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_player_vs_team_unique 
+ON public.player_vs_team_mv (performance_type, player_id, opponent_team_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_season_batting_unique 
+ON public.season_batting_stats_mv (batter_id, season_year);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_season_bowling_unique 
+ON public.season_bowling_stats_mv (bowler_id, season_year);
+
+-- Then refresh concurrently
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.bowler_performance_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.batting_performance_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.player_career_stats_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.player_vs_team_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.season_batting_stats_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.season_bowling_stats_mv;

@@ -1,284 +1,642 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cricket SQL Copilot — Test Page</title>
   <style>
-    :root{
-      --bg:#0b0c10; --card:#121318; --muted:#9aa1ad; --text:#e9ecf1; --accent:#6ee7b7; --danger:#ff6b6b; --border:#222432;
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><style> :root {
+      --bg: #030712;
+      --card: rgba(17, 24, 39, 0.7);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.2);
+      --danger: #ef4444;
+      --glass: rgba(17, 24, 39, 0.8);
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    .wrap{max-width:1024px;margin:0 auto;padding:24px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
-    h1{font-size:20px;margin:0 0 8px}
-    p.sub{color:var(--muted);margin:0 0 16px}
-    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
-    input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1016;color:var(--text)}
-    textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0e1016;color:var(--text);min-height:70px}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row > *{flex:1}
-    button{appearance:none;border:1px solid var(--border);background:#171924;color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
-    button.primary{background:var(--accent);color:#032014;border-color:transparent;font-weight:600}
-    button.ghost{background:transparent}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1016;color:var(--muted);cursor:pointer}
-    .muted{color:var(--muted)}
-    .error{color:var(--danger)}
-    details{border:1px solid var(--border);border-radius:12px;padding:8px 12px;background:#0e1016}
-    details summary{cursor:pointer;color:var(--muted)}
-    pre{background:#0a0c12;border:1px solid var(--border);padding:12px;border-radius:12px;overflow:auto}
-    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{border:1px solid var(--border);padding:8px 10px;text-align:left}
-    th{background:#0f1118}
-    .right{display:flex;gap:8px;align-items:center}
-    .pill{display:inline-block;background:#0f1118;border:1px solid var(--border);padding:3px 8px;border-radius:999px;color:var(--muted);font-size:12px}
-    .footer{margin-top:18px;color:var(--muted);font-size:12px}
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      background-image:
+        radial-gradient(circle at 50% -20%, #1e3a8a 0%, transparent 50%),
+        radial-gradient(circle at 0% 100%, #111827 0%, transparent 50%);
+      color: var(--text);
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin: 0;
+      background: linear-gradient(to right, #6ee7b7, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 16px;
+    }
+
+    .chat-card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .input-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+
+    textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 16px;
+      padding: 16px;
+      resize: none;
+      min-height: 80px;
+      outline: none;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 10px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-size: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #064e3b;
+      border: none;
+    }
+
+    button.primary:hover {
+      background: #34d399;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .chip:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .status-pill {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    /* Message Stream */
+    .stream {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .message {
+      padding: 20px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .msg-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 12px;
+      display: block;
+      font-weight: 600;
+    }
+
+    .ai-answer {
+      line-height: 1.6;
+      color: #e5e7eb;
+      font-size: 15px;
+    }
+
+    .ai-answer strong {
+      color: var(--accent);
+    }
+
+    .ai-answer p {
+      margin: 0 0 12px;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #93c5fd;
+    }
+
+    pre {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 16px;
+      overflow: auto;
+      margin: 12px 0;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: #f8fafc;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(0, 0, 0, 0.1);
+      margin-top: 20px;
+    }
+
+    summary {
+      padding: 12px 20px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .details-content {
+      padding: 0 20px 20px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      outline: none;
+    }
   </style>
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Cricket SQL Copilot — Test</h1>
-      <p class="sub">Call your Supabase Edge Function, see the generated SQL, and preview results.</p>
+  <div class="app-container">
+    <header>
+      <h1>Cricket SQL Copilot</h1>
+      <p class="sub">Your premium AI assistant for IPL and Cricket insights.</p>
+    </header>
 
-      <label>Edge Function URL (hardcoded)</label>
-        <input id="fnUrl" type="text" value="https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot" disabled />
-
-      <details style="margin-top:8px">
-        <summary>Advanced headers (optional)</summary>
-        <div class="row" style="margin-top:8px">
-          <div>
-            <label>apikey (optional)</label>
-            <input id="apikey" type="text" placeholder="Your Supabase anon key (if required)" />
-          </div>
-          <div>
-            <label>Authorization (optional)</label>
-            <input id="auth" type="text" placeholder="Bearer &lt;token&gt; (if required)" />
-          </div>
+    <div class="chat-card">
+      <div class="input-section">
+        <div class="input-wrapper">
+          <textarea id="question" placeholder="Ask anything about cricket data..."></textarea>
         </div>
-      </details>
 
-      <label style="margin-top:12px">Ask a question</label>
-      <textarea id="question" placeholder="e.g., Top 10 run scorers in 2019"></textarea>
-
-      <div class="row" style="align-items:center;margin-top:8px">
-        <div class="right">
-          <button id="askBtn" class="primary">Ask</button>
-          <button id="schemaBtn" class="ghost">Test /schema</button>
-          <span id="status" class="pill">Idle</span>
+        <div class="controls">
+          <div class="actions">
+            <button id="askBtn" class="primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+              </svg>
+              Ask
+            </button>
+            <button id="schemaBtn" class="ghost">Schema</button>
+          </div>
+          <span id="status" class="status-pill">System Ready</span>
         </div>
+
         <div class="chips">
-          <span class="chip" data-q="Top 10 run scorers in 2019">Top 10 run scorers in 2019</span>
-          <span class="chip" data-q="Best economy bowlers (min 30 overs) in 2020">Best economy bowlers, 2020</span>
-          <span class="chip" data-q="Win % by toss decision per season">Win % by toss decision / season</span>
-          <span class="chip" data-q="Matches with super over and winner">Super over matches + winner</span>
+          <span class="chip" data-q="Top 10 run scorers in 2019">Top 10 scorers 2019</span>
+          <span class="chip" data-q="Best economy bowlers (min 30 overs) in 2020">Top bowlers 2020</span>
+          <span class="chip" data-q="Win % by toss decision per season">Win % by toss</span>
+          <span class="chip" data-q="Matches with super over and winner">Super overs</span>
         </div>
       </div>
 
-      <p id="err" class="error" style="margin-top:10px"></p>
+      <p id="err" class="error-msg"></p>
 
-      <div id="summaryWrap" style="display:none;margin-top:8px">
-        <label>Summary</label>
-        <p id="summary" class="muted"></p>
-      </div>
-    <div id="answerWrap" style="display:none;margin-top:12px">
-    <label>AI Analysis</label>
-    <div id="answer" style="background:#0e1016;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);line-height:1.6"></div>
-    </div>
+      <div id="stream" class="stream">
+        <!-- AI Response will appear here -->
+        <div id="answerWrap" style="display:none" class="message">
+          <span class="msg-label">AI Analysis</span>
+          <div id="answer" class="ai-answer"></div>
+        </div>
 
-      <div id="sqlWrap" style="display:none;margin-top:8px">
-        <div class="right" style="justify-content:space-between">
-          <label>Generated SQL</label>
-          <div class="right">
-            <button id="copySql">Copy</button>
+        <div id="sqlWrap" style="display:none" class="message">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+            <span class="msg-label">Generated SQL</span>
+            <button id="copySql" style="padding:4px 12px; font-size:11px">Copy</button>
+          </div>
+          <pre><code id="sql"></code></pre>
+          <div id="summary" class="sub" style="font-size:13px; margin-top:12px"></div>
+        </div>
+
+        <div id="tableWrap" style="display:none" class="message">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+            <span class="msg-label">Query Results</span>
+            <div style="display:flex; gap:8px; align-items:center">
+              <button id="downloadCsv" style="padding:4px 12px; font-size:11px">CSV</button>
+              <span id="rowCount" class="status-pill" style="font-size:10px">0 rows</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div id="tableContainer"></div>
           </div>
         </div>
-        <pre><code id="sql"></code></pre>
       </div>
 
-      <div id="tableWrap" style="display:none;margin-top:8px">
-        <div class="right" style="justify-content:space-between">
-          <label>Results</label>
-          <div class="right">
-            <button id="downloadCsv">Download CSV</button>
-            <span id="rowCount" class="pill">Rows: 0</span>
+      <details>
+        <summary>Advanced Configuration</summary>
+        <div class="details-content">
+          <div class="field">
+            <label>Edge Function URL</label>
+            <input id="fnUrl" type="text" value="https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot"
+              disabled />
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>API Key (Optional)</label>
+              <input id="apikey" type="text" placeholder="Supabase anon key" />
+            </div>
+            <div class="field">
+              <label>Auth Token (Optional)</label>
+              <input id="auth" type="text" placeholder="Bearer <token>" />
+            </div>
           </div>
         </div>
-        <div id="tableContainer"></div>
-      </div>
-
-      <details style="margin-top:12px">
-        <summary>Raw response</summary>
-        <pre><code id="raw"></code></pre>
       </details>
-
     </div>
   </div>
 
-<script>
-  const els = {
-    fnUrl: document.getElementById('fnUrl'),
-    apikey: document.getElementById('apikey'),
-    auth: document.getElementById('auth'),
-    question: document.getElementById('question'),
-    askBtn: document.getElementById('askBtn'),
-    schemaBtn: document.getElementById('schemaBtn'),
-    status: document.getElementById('status'),
-    err: document.getElementById('err'),
-    summaryWrap: document.getElementById('summaryWrap'),
-    summary: document.getElementById('summary'),
-    sqlWrap: document.getElementById('sqlWrap'),
-    sql: document.getElementById('sql'),
-    copySql: document.getElementById('copySql'),
-    tableWrap: document.getElementById('tableWrap'),
-    tableContainer: document.getElementById('tableContainer'),
-    rowCount: document.getElementById('rowCount'),
-    raw: document.getElementById('raw'),
-  };
-
-  // Hardcode your Edge Function URL
-  const FUNCTION_URL = "https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot";
-  // Reflect it in the input and lock it
-  if (els.fnUrl) {
-    els.fnUrl.value = FUNCTION_URL;
-    els.fnUrl.disabled = true;
-  }
-
-  // Persist only headers locally for convenience
-  const LS_KEYS = { apikey:'sqlcopilot:apikey', auth:'sqlcopilot:auth' };
-  els.apikey.value = localStorage.getItem(LS_KEYS.apikey) || '';
-  els.auth.value = localStorage.getItem(LS_KEYS.auth) || '';
-  [els.apikey, els.auth].forEach(inp => inp.addEventListener('change', () => {
-    localStorage.setItem(LS_KEYS.apikey, els.apikey.value.trim());
-    localStorage.setItem(LS_KEYS.auth, els.auth.value.trim());
-  }));
-
-  // Example chips
-  document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
-    els.question.value = ch.getAttribute('data-q');
-  }));
-
-  function setStatus(text){ els.status.textContent = text; }
-  function setError(msg){ els.err.textContent = msg || ''; }
-  function show(el, on){ el.style.display = on ? '' : 'none'; }
-
-  // If Authorization is empty but apikey provided, default to Bearer <apikey>
-  function buildHeaders(){
-    const h = { 'Content-Type': 'application/json' };
-    const apikey = els.apikey.value.trim();
-    const auth = els.auth.value.trim();
-    if (apikey) h['apikey'] = apikey;
-    if (auth) h['Authorization'] = auth;
-    else if (apikey) h['Authorization'] = `Bearer ${apikey}`;
-    return h;
-  }
-
-  function renderTable(columns, rows){
-    if (!columns || !columns.length){ els.tableContainer.innerHTML = '<p class="muted">No columns</p>'; return; }
-    let html = '<table><thead><tr>' + columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead><tbody>';
-    for (const r of rows){
-      html += '<tr>' + columns.map(c=>`<td>${escapeHtml(r[c])}</td>`).join('') + '</tr>';
-    }
-    html += '</tbody></table>';
-    els.tableContainer.innerHTML = html;
-  }
-
-  function escapeHtml(v){
-    if (v === null || v === undefined) return '';
-    return String(v).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
-  }
-
-  function toCsv(columns, rows){
-    const esc = (x)=>`"${String(x ?? '').replace(/"/g,'""')}"`;
-    const head = columns.map(esc).join(',');
-    const body = rows.map(r => columns.map(c => esc(r[c])).join(',')).join('\n');
-    return head + '\n' + body;
-  }
-
-async function ask(){
-  setError(''); setStatus('Calling function…');
-  show(els.summaryWrap,false); show(document.getElementById('answerWrap'),false); show(els.sqlWrap,false); show(els.tableWrap,false);
-  els.raw.textContent = '';
-
-  const url = FUNCTION_URL;
-  const q = els.question.value.trim();
-  if (!q){ setError('Enter a question'); return; }
-
-  els.askBtn.disabled = true;
-  try{
-    const r = await fetch(url, {
-      method:'POST', headers: buildHeaders(),
-      body: JSON.stringify({ question: q })
-    });
-    const text = await r.text();
-    els.raw.textContent = text;
-    let j;
-    try{ j = JSON.parse(text); } catch{ throw new Error('Invalid JSON returned'); }
-    if (!r.ok){ throw new Error(j.error || 'Request failed'); }
-
-    // Display AI answer (the main analytical response)
-    if (j.answer) {
-      document.getElementById('answer').innerHTML = j.answer
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/^/, '<p>')
-        .replace(/$/, '</p>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      show(document.getElementById('answerWrap'), true);
-    } else {
-      show(document.getElementById('answerWrap'), false);
-    }
-
-    // Display summary & SQL
-    els.summary.textContent = j.summary || '';
-    show(els.summaryWrap, !!j.summary);
-    els.sql.textContent = j.sql || '';
-    show(els.sqlWrap, !!j.sql);
-
-    // Table
-    const cols = j.columns || [];
-    const rows = j.rows || [];
-    renderTable(cols, rows);
-    els.rowCount.textContent = 'Rows: ' + (rows.length || 0);
-    show(els.tableWrap, rows.length > 0);
-
-    // Copy & CSV handlers
-    els.copySql.onclick = () => navigator.clipboard.writeText(j.sql || '');
-    document.getElementById('downloadCsv').onclick = () => {
-      const csv = toCsv(cols, rows);
-      const blob = new Blob([csv], { type:'text/csv' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'results.csv';
-      a.click();
-      URL.revokeObjectURL(a.href);
+  <script>
+    const els = {
+      fnUrl: document.getElementById('fnUrl'),
+      apikey: document.getElementById('apikey'),
+      auth: document.getElementById('auth'),
+      question: document.getElementById('question'),
+      askBtn: document.getElementById('askBtn'),
+      schemaBtn: document.getElementById('schemaBtn'),
+      status: document.getElementById('status'),
+      err: document.getElementById('err'),
+      summary: document.getElementById('summary'),
+      answerWrap: document.getElementById('answerWrap'),
+      answer: document.getElementById('answer'),
+      sqlWrap: document.getElementById('sqlWrap'),
+      sql: document.getElementById('sql'),
+      copySql: document.getElementById('copySql'),
+      tableWrap: document.getElementById('tableWrap'),
+      tableContainer: document.getElementById('tableContainer'),
+      rowCount: document.getElementById('rowCount'),
     };
-    setStatus('Done');
-  } catch(e){
-    setError(e.message || String(e));
-    setStatus('Error');
-  } finally{
-    els.askBtn.disabled = false;
-  }
-}
-  async function testSchema(){
-    setError(''); setStatus('Calling /schema…'); els.raw.textContent = '';
-    const url = FUNCTION_URL.replace(/\/$/, '') + '/schema';
-    try{
-      const r = await fetch(url, { headers: buildHeaders() });
-      const text = await r.text();
-      els.raw.textContent = text;
-      if (!r.ok) throw new Error('Schema request failed');
-      setStatus('Schema OK');
-    } catch(e){ setError(e.message || String(e)); setStatus('Error'); }
-  }
 
-  els.askBtn.addEventListener('click', ask);
-  els.schemaBtn.addEventListener('click', testSchema);
-</script>
+    const FUNCTION_URL = "https://szbtcjeomzihqatdwcwc.supabase.co/functions/v1/sqlcopilot";
+
+    // Persist headers
+    const LS_KEYS = { apikey: 'sqlcopilot:apikey', auth: 'sqlcopilot:auth' };
+    els.apikey.value = localStorage.getItem(LS_KEYS.apikey) || '';
+    els.auth.value = localStorage.getItem(LS_KEYS.auth) || '';
+    [els.apikey, els.auth].forEach(inp => inp.addEventListener('change', () => {
+      localStorage.setItem(LS_KEYS.apikey, els.apikey.value.trim());
+      localStorage.setItem(LS_KEYS.auth, els.auth.value.trim());
+    }));
+
+    function setStatus(text, isError = false) {
+      els.status.textContent = text;
+      els.status.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+      if (text.includes('…')) {
+        els.status.classList.add('pulse');
+      } else {
+        els.status.classList.remove('pulse');
+      }
+    }
+
+    function setError(msg) { els.err.textContent = msg || ''; }
+    function show(el, on) { el.style.display = on ? 'block' : 'none'; }
+
+    function buildHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      const apikey = els.apikey.value.trim();
+      const auth = els.auth.value.trim();
+      if (apikey) h['apikey'] = apikey;
+      if (auth) h['Authorization'] = auth;
+      else if (apikey) h['Authorization'] = `Bearer ${apikey}`;
+      return h;
+    }
+
+    function renderTable(columns, rows) {
+      if (!columns || !columns.length) { els.tableContainer.innerHTML = '<p class="sub">No columns found</p>'; return; }
+      let html = '<table><thead><tr>' + columns.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead><tbody>';
+      for (const r of rows) {
+        html += '<tr>' + columns.map(c => `<td>${escapeHtml(r[c])}</td>`).join('') + '</tr>';
+      }
+      html += '</tbody></table>';
+      els.tableContainer.innerHTML = html;
+    }
+
+    function escapeHtml(v) {
+      if (v === null || v === undefined) return '';
+      return String(v).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[s]));
+    }
+
+    function toCsv(columns, rows) {
+      const esc = (x) => `"${String(x ?? '').replace(/"/g, '""')}"`;
+      const head = columns.map(esc).join(',');
+      const body = rows.map(r => columns.map(c => esc(r[c])).join(',')).join('\n');
+      return head + '\n' + body;
+    }
+
+    async function ask() {
+      const q = els.question.value.trim();
+      if (!q) { setError('Please enter a question first.'); return; }
+
+      setError('');
+      setStatus('Calling AI…');
+      show(els.answerWrap, false); show(els.sqlWrap, false); show(els.tableWrap, false);
+
+      els.askBtn.disabled = true;
+
+      try {
+        const r = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: buildHeaders(),
+          body: JSON.stringify({ question: q })
+        });
+
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'The server returned an error.');
+
+        // AI Answer
+        if (j.answer) {
+          els.answer.innerHTML = j.answer
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/^/, '<p>')
+            .replace(/$/, '</p>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`(.*?)`/g, '<code>$1</code>');
+          show(els.answerWrap, true);
+        }
+
+        // SQL & Summary
+        if (j.sql) {
+          els.sql.textContent = j.sql;
+          els.summary.textContent = j.summary || '';
+          show(els.sqlWrap, true);
+        }
+
+        // Table Results
+        const cols = j.columns || [];
+        const rows = j.rows || [];
+        if (rows.length > 0) {
+          renderTable(cols, rows);
+          els.rowCount.textContent = `${rows.length} rows`;
+          show(els.tableWrap, true);
+
+          document.getElementById('downloadCsv').onclick = () => {
+            const csv = toCsv(cols, rows);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'query_results.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          };
+        }
+
+        els.copySql.onclick = () => {
+          navigator.clipboard.writeText(j.sql || '');
+          const oldText = els.copySql.textContent;
+          els.copySql.textContent = 'Copied!';
+          setTimeout(() => els.copySql.textContent = oldText, 2000);
+        };
+
+        setStatus('Ready');
+      } catch (e) {
+        setError(e.message);
+        setStatus('Error', true);
+      } finally {
+        els.askBtn.disabled = false;
+      }
+    }
+
+    async function testSchema() {
+      setError(''); setStatus('Checking schema…');
+      const url = FUNCTION_URL.replace(/\/$/, '') + '/schema';
+      try {
+        const r = await fetch(url, { headers: buildHeaders() });
+        if (!r.ok) throw new Error('Schema check failed.');
+        setStatus('Schema OK');
+      } catch (e) {
+        setError(e.message);
+        setStatus('Error', true);
+      }
+    }
+
+    els.askBtn.addEventListener('click', ask);
+    els.schemaBtn.addEventListener('click', testSchema);
+    document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+      els.question.value = ch.getAttribute('data-q');
+      ask();
+    }));
+
+    els.question.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        ask();
+      }
+    });
+  </script>
 
 </body>
+
 </html>
